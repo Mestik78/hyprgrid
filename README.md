@@ -100,7 +100,54 @@ order = [
     "eDP-1",
     "HDMI-A-2"
 ]
+
+[waybar]
+# Main format string
+# Variables: {row}, {workspaces}, {active}, {monitor}
+format = " {row} {workspaces}"
+
+# Active workspace template ({col}, {ws}, {row})
+active_format = "<b><u>{col}</u></b>"
+
+# Inactive/occupied workspace template
+occupied_format = "<span alpha='60%'>{col}</span>"
+
+# Separator between workspace numbers
+separator = " "
+
+# Show 2D workspace bounding-box grid tooltip
+show_tooltip = true
 ```
+
+### 🎨 Rice & Theme Customization Examples
+
+**Minimalist / Dot-style rice:**
+```toml
+[waybar]
+format = "R{row}  {workspaces}"
+active_format = "●"
+occupied_format = "○"
+separator = " "
+```
+
+**Pure CSS-controlled (No Pango):**
+```toml
+[waybar]
+format = "{row} | {workspaces}"
+active_format = "[{col}]"
+occupied_format = "{col}"
+```
+
+**Custom colors / Catppuccin / Tokyo Night:**
+```toml
+[waybar]
+format = " {row}  {workspaces}"
+active_format = "<span color='#89b4fa'><b>{col}</b></span>"
+occupied_format = "<span color='#6c7086'>{col}</span>"
+```
+
+Waybar automatically receives dynamic CSS classes on `#custom-ws_grid`:
+`.m0`, `.m1`, `.row-1`, `.col-2`, `.active`, allowing deep styling in `style.css`.
 
 ---
 

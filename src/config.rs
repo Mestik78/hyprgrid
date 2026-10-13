@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub grid: GridConfig,
     pub monitors: MonitorConfig,
+    pub waybar: WaybarConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -19,10 +20,33 @@ pub struct MonitorConfig {
     pub order: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct WaybarConfig {
+    pub format: String,
+    pub active_format: String,
+    pub occupied_format: String,
+    pub empty_format: String,
+    pub separator: String,
+    pub show_tooltip: bool,
+}
+
 impl GridConfig {
     /// Total workspace slots per monitor.
     pub fn capacity(&self) -> u32 {
         self.rows * self.cols
+    }
+}
+
+impl Default for WaybarConfig {
+    fn default() -> Self {
+        Self {
+            format: " {row} {workspaces}".into(),
+            active_format: "<b><u>{col}</u></b>".into(),
+            occupied_format: "<span alpha='60%'>{col}</span>".into(),
+            empty_format: "".into(),
+            separator: " ".into(),
+            show_tooltip: true,
+        }
     }
 }
 
@@ -34,6 +58,7 @@ impl Default for Config {
                 isolate: true,
                 order: Vec::new(),
             },
+            waybar: WaybarConfig::default(),
         }
     }
 }
@@ -146,6 +171,8 @@ impl Config {
                     continue;
                 }
 
+                let unquoted = value.trim_matches('"').trim_matches('\'').to_string();
+
                 match (section.as_str(), key) {
                     ("grid", "rows") => {
                         if let Ok(v) = value.parse::<u32>() {
@@ -162,6 +189,24 @@ impl Config {
                     }
                     ("monitors", "order") => {
                         cfg.monitors.order = Self::parse_array(value);
+                    }
+                    ("waybar", "format") => {
+                        cfg.waybar.format = unquoted;
+                    }
+                    ("waybar", "active_format") => {
+                        cfg.waybar.active_format = unquoted;
+                    }
+                    ("waybar", "occupied_format") => {
+                        cfg.waybar.occupied_format = unquoted;
+                    }
+                    ("waybar", "empty_format") => {
+                        cfg.waybar.empty_format = unquoted;
+                    }
+                    ("waybar", "separator") => {
+                        cfg.waybar.separator = unquoted;
+                    }
+                    ("waybar", "show_tooltip") => {
+                        cfg.waybar.show_tooltip = value.eq_ignore_ascii_case("true");
                     }
                     _ => {}
                 }
@@ -214,11 +259,19 @@ mod tests {
                 "eDP-1",
                 "HDMI-A-2", # external
             ]
+
+            [waybar]
+            format = "{workspaces}"
+            active_format = "[{col}]"
+            occupied_format = "{col}"
         "#;
         let cfg = Config::parse(toml);
         assert_eq!(cfg.grid.rows, 8);
         assert_eq!(cfg.grid.cols, 12);
         assert!(cfg.monitors.isolate);
         assert_eq!(cfg.monitors.order, vec!["eDP-1", "HDMI-A-2"]);
+        assert_eq!(cfg.waybar.format, "{workspaces}");
+        assert_eq!(cfg.waybar.active_format, "[{col}]");
+        assert_eq!(cfg.waybar.occupied_format, "{col}");
     }
 }

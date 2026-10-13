@@ -38,6 +38,7 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
     // Decode in 3D
     let coord = Coord3D::from_ws_id(current_id, cfg);
     let t = coord.y;
+    let u = coord.x;
     let display_t = t + 1;
 
     let start = Coord3D { m, y: t, x: 1 }.to_ws_id(cfg);
@@ -61,18 +62,40 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
     }
     existing.sort_unstable();
 
-    // Bar text: " 1  1 2 3"
-    let mut text = format!("<span alpha='60%'> {display_t} </span> ");
-    for w in &existing {
-        let w_coord = Coord3D::from_ws_id(*w, cfg);
-        let w_u = w_coord.x;
-        if *w == current_id {
-            text.push_str(&format!("<b><u>{w_u}</u></b> "));
-        } else {
-            text.push_str(&format!("<span alpha='60%'>{w_u}</span> "));
-        }
-    }
-    let text = text.trim_end().to_string();
+    // Render workspaces according to user's rice template
+    let ws_items: Vec<String> = existing
+        .iter()
+        .map(|w| {
+            let w_coord = Coord3D::from_ws_id(*w, cfg);
+            let w_u = w_coord.x;
+            let tmpl = if *w == current_id {
+                &cfg.waybar.active_format
+            } else {
+                &cfg.waybar.occupied_format
+            };
+            tmpl.replace("{col}", &w_u.to_string())
+                .replace("{ws}", &w.to_string())
+                .replace("{row}", &display_t.to_string())
+        })
+        .collect();
+
+    let ws_rendered = ws_items.join(&cfg.waybar.separator);
+
+    let text = cfg
+        .waybar
+        .format
+        .replace("{row}", &display_t.to_string())
+        .replace("{workspaces}", &ws_rendered)
+        .replace("{active}", &u.to_string())
+        .replace("{monitor}", &target_mon);
+
+    // Dynamic classes for rice styling in Waybar style.css
+    let classes = vec![
+        format!("m{m}"),
+        format!("row-{display_t}"),
+        format!("col-{u}"),
+        "active".to_string(),
+    ];
 
     // Minimal Bounding Box Grid Tooltip
     let mut eval_set = all_existing.clone();
@@ -131,7 +154,8 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
 
     let json = serde_json::json!({
         "text": text,
-        "tooltip": tooltip,
+        "tooltip": if cfg.waybar.show_tooltip { &tooltip } else { "" },
+        "class": classes,
     });
 
     let stdout = io::stdout();

@@ -20,3 +20,23 @@ order = [
     "eDP-1",
     "HDMI-A-2"
 ]
+
+[waybar]
+# Main format string.
+# Available variables: {row}, {workspaces}, {active}, {monitor}
+format = " {row} {workspaces}"
+
+# Workspace template for the active workspace.
+# Available variables: {col}, {ws}, {row}
+# Can use Pango markup (e.g. "<b><u>{col}</u></b>", "<span color='#89b4fa'>{col}</span>")
+# or plain text (e.g. "[{col}]", "●") for pure CSS styling.
+active_format = "<b><u>{col}</u></b>"
+
+# Workspace template for occupied workspaces (inactive).
+occupied_format = "<span alpha='60%'>{col}</span>"
+
+# Separator between workspace elements in the list
+separator = " "
+
+# Show 2D workspace bounding-box grid tooltip
+show_tooltip = true

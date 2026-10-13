@@ -46,6 +46,7 @@ mod tests {
         Config {
             grid: GridConfig { rows, cols },
             monitors: MonitorConfig { isolate: true, order: vec![] },
+            waybar: Default::default(),
         }
     }
 
