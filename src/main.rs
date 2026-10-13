@@ -4,6 +4,7 @@ mod create;
 mod grid;
 mod hypr;
 mod map;
+mod setup;
 mod state;
 mod waybar;
 
@@ -26,6 +27,7 @@ COMMANDS:
     create <axis> <direction>        Create empty workspaces or shift grid
     status [--once]                  Output Waybar JSON status (stream or single)
     map                              Interactive 2D TUI grid map
+    setup, install-keybinds          Generate & install Hyprland keybindings
     help, --help, -h                 Show this help message
     --version, -v                    Show version
 
@@ -233,6 +235,14 @@ fn main() -> ExitCode {
         "map" => {
             if let Err(e) = map::run(&cfg) {
                 eprintln!("hyprgrid map error: {e}");
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        "setup" | "install-keybinds" | "init" => {
+            if let Err(e) = setup::run(&args[2..]) {
+                eprintln!("hyprgrid setup error: {e}");
                 ExitCode::FAILURE
             } else {
                 ExitCode::SUCCESS

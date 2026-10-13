@@ -79,6 +79,26 @@ The install script compiles the binary in `--release` mode, copies it to `~/.loc
 
 ---
 
+## ⚡ Quick Start: Automatic Setup
+
+Configure all recommended keybindings in Hyprland with a single command:
+
+```bash
+hyprgrid setup
+```
+
+This will automatically:
+1. Generate a modular `~/.config/hypr/hyprgrid.conf` with all grid shortcuts.
+2. Add `source = ~/.config/hypr/hyprgrid.conf` to your `~/.config/hypr/hyprland.conf`.
+3. Reload Hyprland so shortcuts are immediately active.
+
+Useful flags:
+* `hyprgrid setup --print`: Print generated configuration to stdout without modifying files.
+* `hyprgrid setup --lua`: Generate Lua format for `hyprland-lua` users.
+* `hyprgrid setup --mod-x CTRL --mod-y SUPER`: Customize modifier keys.
+
+---
+
 ## ⚙️ Configuration (`~/.config/hyprgrid/config.toml`)
 
 ```toml
