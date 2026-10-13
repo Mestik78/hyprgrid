@@ -1,0 +1,22 @@
+# hyprgrid configuration
+# Location: ~/.config/hyprgrid/config.toml
+
+[grid]
+# Number of rows (Y dimension) per monitor (1-100, default: 10)
+rows = 10
+
+# Number of columns (X dimension) per row (1-100, default: 10)
+cols = 10
+
+[monitors]
+# Isolate workspaces per monitor (3D mode: Monitor × Row × Column)
+# Set to false to share a single flat 2D grid across all monitors
+isolate = true
+
+# Deterministic monitor ordering (Z dimension: 0, 1, 2, ...)
+# e.g. Monitor 0 gets workspaces 1..100, Monitor 1 gets 101..200
+# Falls back to ~/.config/hypr/monitors_order if left empty
+order = [
+    "eDP-1",
+    "HDMI-A-2"
+]
