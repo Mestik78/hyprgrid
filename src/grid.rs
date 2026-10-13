@@ -25,7 +25,10 @@ pub enum Target {
 
 pub fn run(cfg: &Config, action: Action, axis: Axis, target: Target) -> Result<(), String> {
     let current_ws = hypr::active_workspace()?;
-    let current_id = (current_ws.id.max(1)) as u32;
+    if current_ws.id <= 0 || current_ws.name.starts_with("special:") {
+        return Err("Cannot perform grid navigation on a special workspace.".into());
+    }
+    let current_id = current_ws.id as u32;
     let m = hypr::resolve_monitor_index(cfg, &current_ws.monitor);
 
     let coord = Coord3D::from_ws_id(current_id, cfg);
@@ -187,7 +190,7 @@ pub fn run(cfg: &Config, action: Action, axis: Axis, target: Target) -> Result<(
         Action::MoveAll => {
             let clients = hypr::clients()?;
             for c in clients {
-                if c.workspace.id == current_id as i32 {
+                if c.workspace.id == current_id as i32 && !c.pinned {
                     let _ = hypr::move_window_addr_to(&c.address, new_id);
                 }
             }

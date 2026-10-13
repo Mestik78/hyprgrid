@@ -8,10 +8,12 @@ INSTALL_DIR="${HOME}/.local/bin"
 mkdir -p "$INSTALL_DIR"
 
 echo "📦 Installing binary to ${INSTALL_DIR}/hyprgrid..."
+rm -f "${INSTALL_DIR}/hyprgrid"
 cp target/release/hyprgrid "${INSTALL_DIR}/hyprgrid"
 chmod +x "${INSTALL_DIR}/hyprgrid"
 
 if [ -d "${HOME}/.cargo/bin" ]; then
+    rm -f "${HOME}/.cargo/bin/hyprgrid"
     cp target/release/hyprgrid "${HOME}/.cargo/bin/hyprgrid"
 fi
 

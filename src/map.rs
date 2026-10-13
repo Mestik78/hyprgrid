@@ -5,7 +5,8 @@ use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, Clear, ClearType,
+    disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
+    LeaveAlternateScreen,
 };
 
 use crate::config::Config;
@@ -26,25 +27,35 @@ struct RawModeGuard;
 
 impl RawModeGuard {
     fn new() -> Result<Self, String> {
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = execute!(std::io::stdout(), Show, LeaveAlternateScreen);
+            let _ = disable_raw_mode();
+            default_hook(info);
+        }));
+
         enable_raw_mode().map_err(|e| format!("enable raw mode: {e}"))?;
-        let _ = execute!(stdout(), Hide);
+        let _ = execute!(stdout(), EnterAlternateScreen, Hide);
         Ok(Self)
     }
 }
 
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
-        let _ = execute!(stdout(), Show);
+        let _ = execute!(stdout(), LeaveAlternateScreen, Show);
         let _ = disable_raw_mode();
-        println!();
     }
 }
 
 pub fn run(cfg: &Config) -> Result<(), String> {
+    let current_ws = hypr::active_workspace()?;
+    if current_ws.id <= 0 || current_ws.name.starts_with("special:") {
+        return Err("Cannot open workspace map while in a special workspace/scratchpad.".into());
+    }
+
     let _guard = RawModeGuard::new()?;
 
-    let current_ws = hypr::active_workspace()?;
-    let current_id = current_ws.id.max(1) as u32;
+    let current_id = current_ws.id as u32;
     let current_mon = current_ws.monitor.clone();
     let m = hypr::resolve_monitor_index(cfg, &current_mon);
 
@@ -107,59 +118,65 @@ pub fn run(cfg: &Config) -> Result<(), String> {
             cur_u,
         )?;
 
-        if let Event::Key(key) = event::read().map_err(|e| format!("read key: {e}"))? {
-            if key.kind != KeyEventKind::Press {
+        match event::read().map_err(|e| format!("read key: {e}"))? {
+            Event::Key(key) => {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if cur_t > 0 {
+                            cur_t -= 1;
+                        }
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if cur_t + 1 < rows {
+                            cur_t += 1;
+                        }
+                    }
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        if cur_u > 0 {
+                            cur_u -= 1;
+                        }
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        if cur_u + 1 < cols {
+                            cur_u += 1;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        let target = Coord3D {
+                            m,
+                            y: cur_t,
+                            x: cur_u + 1,
+                        }
+                        .to_ws_id(cfg);
+
+                        if cur_t != current_t {
+                            let _ = hypr::set_animation(AnimStyle::SlideVert);
+                        } else {
+                            let _ = hypr::set_animation(AnimStyle::Slide);
+                        }
+                        let _ = hypr::focus_workspace(target);
+                        break;
+                    }
+                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        break;
+                    }
+                    KeyCode::Char('c')
+                        if key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                    {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            Event::Resize(_, _) => {
                 continue;
             }
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if cur_t > 0 {
-                        cur_t -= 1;
-                    }
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if cur_t + 1 < rows {
-                        cur_t += 1;
-                    }
-                }
-                KeyCode::Left | KeyCode::Char('h') => {
-                    if cur_u > 0 {
-                        cur_u -= 1;
-                    }
-                }
-                KeyCode::Right | KeyCode::Char('l') => {
-                    if cur_u + 1 < cols {
-                        cur_u += 1;
-                    }
-                }
-                KeyCode::Enter => {
-                    let target = Coord3D {
-                        m,
-                        y: cur_t,
-                        x: cur_u + 1,
-                    }
-                    .to_ws_id(cfg);
-
-                    if cur_t != current_t {
-                        let _ = hypr::set_animation(AnimStyle::SlideVert);
-                    } else {
-                        let _ = hypr::set_animation(AnimStyle::Slide);
-                    }
-                    let _ = hypr::focus_workspace(target);
-                    break;
-                }
-                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
-                    break;
-                }
-                KeyCode::Char('c')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    break;
-                }
-                _ => {}
-            }
+            _ => {}
         }
     }
 
@@ -191,7 +208,7 @@ fn draw_map(
     }
     println!();
 
-    // Column headers
+    // Column headers (exactly 6 characters per column: "  %2d  ")
     print!("  {C_LABEL}Y\\X ");
     for u in 0..cols {
         print!("  {:2}  ", u + 1);
@@ -228,7 +245,7 @@ fn draw_map(
         }
         println!();
 
-        // Window count sub-row
+        // Window count sub-row (aligned to exactly 6 characters per column)
         print!("  {C_LABEL}   │{C_RESET}");
         for u in 0..cols {
             let ws_id = Coord3D { m, y: t, x: u + 1 }.to_ws_id(cfg);
@@ -236,14 +253,14 @@ fn draw_map(
             if is_exist {
                 let wins = ws_windows.get(&ws_id).copied().unwrap_or(0);
                 if t == cur_t && u == cur_u {
-                    print!(" {C_SELECT}󰖯 {wins}   {C_RESET}");
+                    print!(" {C_SELECT}󰖯 {wins}  {C_RESET}");
                 } else if ws_id == current_id {
-                    print!(" {C_CURRENT}󰖯 {wins}   {C_RESET}");
+                    print!(" {C_CURRENT}󰖯 {wins}  {C_RESET}");
                 } else {
-                    print!(" {C_EXIST}󰖯 {wins}   {C_RESET}");
+                    print!(" {C_EXIST}󰖯 {wins}  {C_RESET}");
                 }
             } else {
-                print!("       ");
+                print!("      ");
             }
         }
         println!();

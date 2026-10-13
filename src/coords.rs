@@ -18,16 +18,18 @@ impl Coord3D {
     /// Formula: `M × capacity + Y × cols + X`
     /// where `capacity = rows × cols`.
     pub fn to_ws_id(&self, cfg: &Config) -> u32 {
-        let cap = cfg.grid.capacity();
-        self.m * cap + self.y * cfg.grid.cols + self.x
+        let cap = cfg.grid.capacity().max(1);
+        let cols = cfg.grid.cols.max(1);
+        let m = if cfg.monitors.isolate { self.m } else { 0 };
+        m * cap + self.y * cols + self.x.max(1)
     }
 
     /// Decode a Hyprland workspace ID to 3D coordinates.
     pub fn from_ws_id(id: u32, cfg: &Config) -> Self {
         let id = id.max(1);
-        let cap = cfg.grid.capacity();
-        let cols = cfg.grid.cols;
-        let m = (id - 1) / cap;
+        let cap = cfg.grid.capacity().max(1);
+        let cols = cfg.grid.cols.max(1);
+        let m = if cfg.monitors.isolate { (id - 1) / cap } else { 0 };
         let local = (id - 1) % cap + 1;
         let y = (local - 1) / cols;
         let x = (local - 1) % cols + 1;

@@ -1,9 +1,9 @@
-use std::io::{BufRead, Write};
+use std::io::{self, BufRead, Write};
+use std::time::Duration;
 
 use crate::config::Config;
 use crate::coords::Coord3D;
 use crate::hypr;
-use crate::state;
 
 pub fn print_status(cfg: &Config) -> Result<(), String> {
     let target_mon = std::env::var("WAYBAR_OUTPUT_NAME").unwrap_or_default();
@@ -38,10 +38,7 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
     // Decode in 3D
     let coord = Coord3D::from_ws_id(current_id, cfg);
     let t = coord.y;
-    let u = coord.x;
     let display_t = t + 1;
-
-    state::save_column(m, t, u);
 
     let start = Coord3D { m, y: t, x: 1 }.to_ws_id(cfg);
     let end = Coord3D {
@@ -65,14 +62,14 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
     existing.sort_unstable();
 
     // Bar text: " 1  1 2 3"
-    let mut text = format!("<span color='#999999'> {display_t} </span> ");
+    let mut text = format!("<span alpha='60%'> {display_t} </span> ");
     for w in &existing {
         let w_coord = Coord3D::from_ws_id(*w, cfg);
         let w_u = w_coord.x;
         if *w == current_id {
-            text.push_str(&format!("<span color='#ffffff'><b>{w_u}</b></span> "));
+            text.push_str(&format!("<b><u>{w_u}</u></b> "));
         } else {
-            text.push_str(&format!("<span color='#888888'>{w_u}</span> "));
+            text.push_str(&format!("<span alpha='60%'>{w_u}</span> "));
         }
     }
     let text = text.trim_end().to_string();
@@ -118,11 +115,9 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
             let display_x = format!("{x:2}");
 
             if id == current_id {
-                tooltip.push_str(&format!(
-                    "<span color='#ffffff'><b>{display_x}</b></span> "
-                ));
+                tooltip.push_str(&format!("<b>[{display_x}]</b> "));
             } else if all_existing.contains(&id) {
-                tooltip.push_str(&format!("<span color='#999999'>{display_x}</span> "));
+                tooltip.push_str(&format!("<span alpha='60%'>{display_x}</span> "));
             } else {
                 tooltip.push_str("   ");
             }
@@ -139,38 +134,75 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
         "tooltip": tooltip,
     });
 
-    println!("{json}");
-    let _ = std::io::stdout().flush();
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    writeln!(handle, "{json}").map_err(|e| format!("stdout write: {e}"))?;
+    handle.flush().map_err(|e| format!("stdout flush: {e}"))?;
     Ok(())
 }
 
 pub fn run_stream(cfg: &Config) -> Result<(), String> {
-    // Initial print
-    let _ = print_status(cfg);
+    let mut backoff_ms = 500;
 
-    // Stream events from Hyprland's socket2
-    let reader = match hypr::event_stream() {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("hyprgrid: failed to connect to event stream: {e}");
-            return Ok(());
+    loop {
+        // Initial state emission
+        if let Err(e) = print_status(cfg) {
+            if e.contains("Broken pipe") {
+                return Ok(());
+            }
         }
-    };
 
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break,
+        // Establish connection to socket2 with retry backoff
+        let mut reader = match hypr::event_stream() {
+            Ok(r) => {
+                backoff_ms = 500;
+                r
+            }
+            Err(e) => {
+                eprintln!("hyprgrid: event stream connection failed: {e}. Retrying in {backoff_ms}ms...");
+                std::thread::sleep(Duration::from_millis(backoff_ms));
+                backoff_ms = (backoff_ms * 2).min(5000);
+                continue;
+            }
         };
-        if line.starts_with("workspace>>")
-            || line.starts_with("createworkspace>>")
-            || line.starts_with("destroyworkspace>>")
-            || line.starts_with("focusedmon>>")
-            || line.starts_with("moveworkspace>>")
-        {
-            let _ = print_status(cfg);
-        }
-    }
 
-    Ok(())
+        let mut line = String::with_capacity(256);
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => {
+                    // EOF: Hyprland restarted or closed socket
+                    eprintln!("hyprgrid: event socket disconnected (EOF). Reconnecting...");
+                    break;
+                }
+                Ok(_) => {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("workspace>>")
+                        || trimmed.starts_with("createworkspace>>")
+                        || trimmed.starts_with("destroyworkspace>>")
+                        || trimmed.starts_with("focusedmon>>")
+                        || trimmed.starts_with("moveworkspace>>")
+                        || trimmed.starts_with("movewindow>>")
+                        || trimmed.starts_with("movewindowv2>>")
+                        || trimmed.starts_with("monitoradded>>")
+                        || trimmed.starts_with("monitorremoved>>")
+                        || trimmed.starts_with("renameworkspace>>")
+                    {
+                        if let Err(e) = print_status(cfg) {
+                            if e.contains("Broken pipe") {
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    eprintln!("hyprgrid: event stream error: {e}. Reconnecting...");
+                    break;
+                }
+            }
+        }
+
+        std::thread::sleep(Duration::from_millis(500));
+    }
 }

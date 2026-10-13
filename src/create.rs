@@ -13,7 +13,7 @@ pub enum Direction {
 fn move_all_windows(src: u32, dst: u32) -> Result<(), String> {
     let clients = hypr::clients()?;
     for c in clients {
-        if c.workspace.id == src as i32 {
+        if c.workspace.id == src as i32 && !c.pinned {
             let _ = hypr::move_window_addr_to(&c.address, dst);
         }
     }
@@ -22,7 +22,11 @@ fn move_all_windows(src: u32, dst: u32) -> Result<(), String> {
 
 pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String> {
     let current_ws = hypr::active_workspace()?;
-    let current_id = current_ws.id.max(1) as u32;
+    if current_ws.id <= 0 || current_ws.name.starts_with("special:") {
+        return Err("Cannot perform workspace creation or shifting from a special workspace.".into());
+    }
+
+    let current_id = current_ws.id as u32;
     let current_mon = &current_ws.monitor;
     let m = hypr::resolve_monitor_index(cfg, current_mon);
 
@@ -37,8 +41,8 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
     }
 
     let all_existing = hypr::monitor_workspaces(cfg, current_mon)?;
-    let cols = cfg.grid.cols;
-    let rows = cfg.grid.rows;
+    let cols = cfg.grid.cols.max(1);
+    let rows = cfg.grid.rows.max(1);
 
     if direction == Direction::Empty {
         match axis {
@@ -86,6 +90,10 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
 
     match axis {
         Axis::X => {
+            if cols <= 1 {
+                return Ok(());
+            }
+
             let mut count = 0;
             for i in 1..=cols {
                 let cand = Coord3D { m, y: t, x: i }.to_ws_id(cfg);
@@ -99,53 +107,73 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 return Err("Row full".into());
             }
 
-            let mut empty_u = 0;
+            let mut found_empty_u = None;
             if direction == Direction::Right {
                 for step in 1..cols {
                     let check_u = (u - 1 + step) % cols + 1;
                     let cand = Coord3D { m, y: t, x: check_u }.to_ws_id(cfg);
                     if !all_existing.contains(&cand) {
-                        empty_u = check_u;
+                        found_empty_u = Some(check_u);
                         break;
                     }
                 }
 
-                let target_u = (u % cols) + 1;
-                let mut curr_step = empty_u;
-                while curr_step != target_u {
-                    let prev_step = (curr_step + cols - 2) % cols + 1;
-                    let src = Coord3D { m, y: t, x: prev_step }.to_ws_id(cfg);
-                    let dst = Coord3D { m, y: t, x: curr_step }.to_ws_id(cfg);
+                let empty_u = match found_empty_u {
+                    Some(v) => v,
+                    None => {
+                        hypr::notify("Error: No hay hueco libre para desplazar.");
+                        return Err("No empty slot found".into());
+                    }
+                };
+
+                let target_u_0 = u % cols;
+                let mut curr_step_0 = empty_u - 1;
+                while curr_step_0 != target_u_0 {
+                    let prev_step_0 = (curr_step_0 + cols - 1) % cols;
+                    let src = Coord3D { m, y: t, x: prev_step_0 + 1 }.to_ws_id(cfg);
+                    let dst = Coord3D { m, y: t, x: curr_step_0 + 1 }.to_ws_id(cfg);
                     move_all_windows(src, dst)?;
-                    curr_step = prev_step;
+                    curr_step_0 = prev_step_0;
                 }
-                let target_ws = Coord3D { m, y: t, x: target_u }.to_ws_id(cfg);
+                let target_ws = Coord3D { m, y: t, x: target_u_0 + 1 }.to_ws_id(cfg);
                 hypr::focus_workspace(target_ws)?;
             } else if direction == Direction::Left {
                 for step in 1..cols {
                     let check_u = (u - 1 + cols - (step % cols)) % cols + 1;
                     let cand = Coord3D { m, y: t, x: check_u }.to_ws_id(cfg);
                     if !all_existing.contains(&cand) {
-                        empty_u = check_u;
+                        found_empty_u = Some(check_u);
                         break;
                     }
                 }
 
-                let target_u = (u + cols - 2) % cols + 1;
-                let mut curr_step = empty_u;
-                while curr_step != target_u {
-                    let prev_step = (curr_step % cols) + 1;
-                    let src = Coord3D { m, y: t, x: prev_step }.to_ws_id(cfg);
-                    let dst = Coord3D { m, y: t, x: curr_step }.to_ws_id(cfg);
+                let empty_u = match found_empty_u {
+                    Some(v) => v,
+                    None => {
+                        hypr::notify("Error: No hay hueco libre para desplazar.");
+                        return Err("No empty slot found".into());
+                    }
+                };
+
+                let target_u_0 = (u + cols - 2) % cols;
+                let mut curr_step_0 = empty_u - 1;
+                while curr_step_0 != target_u_0 {
+                    let prev_step_0 = (curr_step_0 + 1) % cols;
+                    let src = Coord3D { m, y: t, x: prev_step_0 + 1 }.to_ws_id(cfg);
+                    let dst = Coord3D { m, y: t, x: curr_step_0 + 1 }.to_ws_id(cfg);
                     move_all_windows(src, dst)?;
-                    curr_step = prev_step;
+                    curr_step_0 = prev_step_0;
                 }
-                let target_ws = Coord3D { m, y: t, x: target_u }.to_ws_id(cfg);
+                let target_ws = Coord3D { m, y: t, x: target_u_0 + 1 }.to_ws_id(cfg);
                 hypr::focus_workspace(target_ws)?;
             }
         }
 
         Axis::Y => {
+            if rows <= 1 {
+                return Ok(());
+            }
+
             let mut count = 0;
             for check_t in 0..rows {
                 let mut is_occ = false;
@@ -171,7 +199,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 return Err("All rows full".into());
             }
 
-            let mut empty_t = 0;
+            let mut found_empty_t = None;
             if direction == Direction::Right {
                 for step in 1..rows {
                     let check_t = (t + step) % rows;
@@ -189,10 +217,18 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                         }
                     }
                     if !is_occ {
-                        empty_t = check_t;
+                        found_empty_t = Some(check_t);
                         break;
                     }
                 }
+
+                let empty_t = match found_empty_t {
+                    Some(v) => v,
+                    None => {
+                        hypr::notify("Error: No hay fila libre para desplazar.");
+                        return Err("No empty row found".into());
+                    }
+                };
 
                 let target_t = (t + 1) % rows;
                 let mut curr_step = empty_t;
@@ -224,10 +260,18 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                         }
                     }
                     if !is_occ {
-                        empty_t = check_t;
+                        found_empty_t = Some(check_t);
                         break;
                     }
                 }
+
+                let empty_t = match found_empty_t {
+                    Some(v) => v,
+                    None => {
+                        hypr::notify("Error: No hay fila libre para desplazar.");
+                        return Err("No empty row found".into());
+                    }
+                };
 
                 let target_t = (t + rows - 1) % rows;
                 let mut curr_step = empty_t;
