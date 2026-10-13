@@ -138,9 +138,9 @@ pub fn print_status(cfg: &Config) -> Result<(), String> {
             let display_x = format!("{x:2}");
 
             if id == current_id {
-                tooltip.push_str(&format!("<b>[{display_x}]</b> "));
+                tooltip.push_str(&format!("<span color='#ffffff'><b>{display_x}</b></span> "));
             } else if all_existing.contains(&id) {
-                tooltip.push_str(&format!("<span alpha='60%'>{display_x}</span> "));
+                tooltip.push_str(&format!("<span color='#999999'>{display_x}</span> "));
             } else {
                 tooltip.push_str("   ");
             }
