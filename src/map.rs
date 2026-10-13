@@ -201,7 +201,7 @@ fn draw_map(
         .map_err(|e| format!("terminal write: {e}"))?;
 
     println!("{C_TITLE}  ╔══════════════════════════════════════╗{C_RESET}");
-    println!("{C_TITLE}  ║      Mapa de Workspaces (2D)         ║{C_RESET}");
+    println!("{C_TITLE}  ║         Workspace Map (2D)           ║{C_RESET}");
     println!("{C_TITLE}  ╚══════════════════════════════════════╝{C_RESET}");
     if !current_mon.is_empty() {
         println!("  {C_LABEL}Monitor:{C_RESET} {C_BOLD}{current_mon}{C_RESET} (M{m})");
@@ -267,7 +267,7 @@ fn draw_map(
     }
 
     println!();
-    println!("  {C_LABEL}Flechas / hjkl: mover  │  Enter: ir al workspace  │  q / Esc: salir{C_RESET}");
+    println!("  {C_LABEL}Arrows / hjkl: move  │  Enter: focus workspace  │  q / Esc: exit{C_RESET}");
 
     let cur_ws = Coord3D {
         m,
@@ -281,9 +281,9 @@ fn draw_map(
     println!();
     if is_exist_cur {
         let title = ws_titles.get(&cur_ws).cloned().unwrap_or_default();
-        println!("  {C_BOLD}Seleccionado:{C_RESET} WS {C_SELECT}{disp_ws}{C_RESET} (ID: {cur_ws})  \"{title}\"");
+        println!("  {C_BOLD}Selected:{C_RESET} WS {C_SELECT}{disp_ws}{C_RESET} (ID: {cur_ws})  \"{title}\"");
     } else {
-        println!("  {C_BOLD}Seleccionado:{C_RESET} WS {C_DIM}{disp_ws} (vacío, ID: {cur_ws}){C_RESET}");
+        println!("  {C_BOLD}Selected:{C_RESET} WS {C_DIM}{disp_ws} (empty, ID: {cur_ws}){C_RESET}");
     }
 
     let _ = out.flush();

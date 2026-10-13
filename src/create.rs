@@ -54,7 +54,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                         return Ok(());
                     }
                 }
-                hypr::notify("La fila está llena.");
+                hypr::notify("Row is full.");
             }
             Axis::Y => {
                 for check_t in 0..rows {
@@ -82,7 +82,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                         return Ok(());
                     }
                 }
-                hypr::notify("Todos los grupos están ocupados.");
+                hypr::notify("All row groups are occupied.");
             }
         }
         return Ok(());
@@ -103,7 +103,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
             }
 
             if count >= cols {
-                hypr::notify("Error: Fila llena, no se puede desplazar.");
+                hypr::notify("Error: Row is full, cannot shift.");
                 return Err("Row full".into());
             }
 
@@ -121,7 +121,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 let empty_u = match found_empty_u {
                     Some(v) => v,
                     None => {
-                        hypr::notify("Error: No hay hueco libre para desplazar.");
+                        hypr::notify("Error: No free slot available to shift.");
                         return Err("No empty slot found".into());
                     }
                 };
@@ -150,7 +150,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 let empty_u = match found_empty_u {
                     Some(v) => v,
                     None => {
-                        hypr::notify("Error: No hay hueco libre para desplazar.");
+                        hypr::notify("Error: No free slot available to shift.");
                         return Err("No empty slot found".into());
                     }
                 };
@@ -195,7 +195,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
             }
 
             if count >= rows {
-                hypr::notify("Error: Todas las filas llenas.");
+                hypr::notify("Error: All rows are occupied.");
                 return Err("All rows full".into());
             }
 
@@ -225,7 +225,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 let empty_t = match found_empty_t {
                     Some(v) => v,
                     None => {
-                        hypr::notify("Error: No hay fila libre para desplazar.");
+                        hypr::notify("Error: No free row available to shift.");
                         return Err("No empty row found".into());
                     }
                 };
@@ -268,7 +268,7 @@ pub fn run(cfg: &Config, axis: Axis, direction: Direction) -> Result<(), String>
                 let empty_t = match found_empty_t {
                     Some(v) => v,
                     None => {
-                        hypr::notify("Error: No hay fila libre para desplazar.");
+                        hypr::notify("Error: No free row available to shift.");
                         return Err("No empty row found".into());
                     }
                 };
